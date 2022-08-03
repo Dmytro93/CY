@@ -1,0 +1,229 @@
+﻿<Window x:Class="CY.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:CY"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="800" Width="1600" Loaded="Window_Loaded" Closed="Window_Closed">
+
+    <TabControl Width="Auto" Height="Auto" Margin="5,5,4.6,5" Background="#F8F51551" Grid.ColumnSpan="2" >
+        <TabItem Name="Tab1" Width="Auto" Height="25" Header="Get All Girls" IsSelected="True">
+            <Grid Margin="2,2,2,2" Height="Auto" ShowGridLines="True">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="7*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="110"></RowDefinition>
+                    <RowDefinition Height="3*"></RowDefinition>
+                </Grid.RowDefinitions>
+                <StackPanel Grid.Row="0" Grid.Column="0" >
+                    <Button x:Name="BGetAllPages" HorizontalAlignment="Center" Margin="5" VerticalAlignment="Stretch" 
+                        Width="100" Padding="2" Click="BGetAllPages_Click">
+                        <Button.Content>
+                            <TextBlock TextAlignment="Center"
+                                TextWrapping="Wrap" 
+                                Text="Собрать все страницы">
+                            </TextBlock>
+                        </Button.Content>
+                    </Button>
+                </StackPanel>
+                <StackPanel Grid.Column="1">
+                    <Label Content="Login" HorizontalAlignment="Left" Margin="1" VerticalAlignment="Top"/>
+                    <TextBox x:Name="LoginTB" HorizontalAlignment="Left" Height="23" Margin="2" TextWrapping="Wrap" VerticalAlignment="Top" Width="120" />
+                    <Label Content="Password" HorizontalAlignment="Left" Margin="1" VerticalAlignment="Top"/>
+                    <PasswordBox x:Name="PWTB" HorizontalAlignment="Left" Height="23" Margin="2" VerticalAlignment="Bottom" Width="120" />
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1*"></ColumnDefinition>
+                            <ColumnDefinition Width="1*"></ColumnDefinition>
+                            <ColumnDefinition Width="1*"></ColumnDefinition>
+                            <ColumnDefinition Width="3*"></ColumnDefinition>
+                            <ColumnDefinition Width="1*"></ColumnDefinition>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition></RowDefinition>
+                            <RowDefinition></RowDefinition>
+                            <RowDefinition></RowDefinition>
+                        </Grid.RowDefinitions>
+                        <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.Column="0" >
+                            <TextBlock Text="Pages" ></TextBlock>
+                            <TextBox Name="txtboxMin" HorizontalAlignment="Left" Height="23" TextWrapping="Wrap" Text="1" VerticalAlignment="Top" Margin="1" MinWidth="50"/>
+                            <TextBox Name="txtboxMax" HorizontalAlignment="Left" Height="23" TextWrapping="Wrap" Text="1" VerticalAlignment="Top" Margin="1" Width="100"/>
+
+                        </StackPanel>
+
+                        <Button Grid.Row="0" Grid.Column="1" IsEnabled="True" Content="VideoLinksToFile"  Name="VideoLinksToFile" Click="VideoLinksToFile_Click"/>
+                        <Button Grid.Row="1" Grid.Column="1" Content="GetVideosInfos" x:Name="GetVideosInfos" Click="GetVideosInfos_Click"/>
+                        <Button Grid.Row="0" Grid.Column="2" Content="Cancel" x:Name="Breaker" Click="Breaker_Click"/>
+                        <Button Grid.Row="1" Grid.Column="2" Content="Check Deleted"  x:Name="CheckDeleted" Click="CheckDeleted_Click"/>
+                        <StackPanel Grid.Row="1" Grid.Column="0"  Orientation="Horizontal" >
+                            <TextBlock x:Name="tBlock1" Text="Host" Grid.Row="1"></TextBlock>
+                            <TextBox x:Name="tBoxHost" Margin="1" MinWidth="150"  HorizontalAlignment="Left" Height="23" TextWrapping="Wrap" Text="" VerticalAlignment="Top" Width="120" TextChanged="tBoxHost_TextChanged"/>
+                        </StackPanel>
+                        <TextBlock x:Name="tBlockId" Text="Id" Grid.Row="1" Grid.RowSpan="2" Grid.Column="3" Height="40" TextWrapping="WrapWithOverflow" VerticalAlignment="Top"></TextBlock>
+                        <TextBlock x:Name="tBlockCurrentId" Text="Id" Grid.Row="1" Grid.Column="4"></TextBlock>
+                        <Button Grid.Row="0" Grid.Column="3" Content="Update Database" IsEnabled="False" x:Name="UpdateDatabase" Click="UpdateDatabase_Click"/>
+                        <Button Grid.Row="0" Grid.Column="4" Content="Download All Girls"  x:Name="DownloadAllGirls" Click="DownloadAll_Click"/>
+                    </Grid>
+                </StackPanel>
+                <StackPanel Grid.Row="1" Grid.Column="2">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="1*"></RowDefinition>
+                            <RowDefinition Height="1*"></RowDefinition>
+                        </Grid.RowDefinitions>
+                    </Grid>
+                    <TextBox AcceptsReturn="True" x:Name="tBox14" MaxHeight="200" Grid.Row="0" Margin="5" MinHeight="150" TextWrapping="WrapWithOverflow" VerticalScrollBarVisibility="Auto"></TextBox>
+                    <TextBox AcceptsReturn="True" x:Name="tBox15" MaxHeight="200" Grid.Row="1" Margin="5" MinHeight="150" TextWrapping="WrapWithOverflow" VerticalScrollBarVisibility="Auto"></TextBox>
+
+                </StackPanel>
+            </Grid>
+        </TabItem>
+        <TabItem Name="Tab4" Width="Auto" Height="25" Header="RetriveInfo">
+            <StackPanel>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"></RowDefinition>
+                        <RowDefinition Height="*"></RowDefinition>
+                        <RowDefinition Height="*"></RowDefinition>
+                        <RowDefinition Height="*"></RowDefinition>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*"></ColumnDefinition>
+                                <ColumnDefinition Width="1*"></ColumnDefinition>
+                                <ColumnDefinition Width="3*"></ColumnDefinition>
+                                <ColumnDefinition Width="1*"></ColumnDefinition>
+                                <ColumnDefinition Width="2*"></ColumnDefinition>
+                                <ColumnDefinition Width="1*"></ColumnDefinition>
+                                <ColumnDefinition Width="1*"></ColumnDefinition>
+                                <ColumnDefinition Width="2*"></ColumnDefinition>
+                                <ColumnDefinition Width="2*"></ColumnDefinition>
+                                <ColumnDefinition Width="2*"></ColumnDefinition>
+                                <ColumnDefinition Width="2*"></ColumnDefinition>
+                                <ColumnDefinition Width="2*"></ColumnDefinition>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" HorizontalAlignment="Stretch" Margin="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="nameCB"></CheckBox>
+                                    <TextBlock>Name</TextBlock>
+                                </StackPanel>
+                                <TextBox KeyDown="Enter_KeyDown" Name="tBox41"></TextBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" HorizontalAlignment="Stretch" Margin="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="birthDateCB"></CheckBox>
+                                    <TextBlock>Born</TextBlock>
+                                </StackPanel>
+                                <TextBox KeyDown="Enter_KeyDown" Name="tBox42"></TextBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" HorizontalAlignment="Stretch" Margin="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="linkCB"></CheckBox>
+                                    <TextBlock>Link</TextBlock>
+                                </StackPanel>
+                                <TextBox KeyDown="Enter_KeyDown" Name="tBox43"></TextBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="3" HorizontalAlignment="Stretch" Margin="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="ageThenCB"></CheckBox>
+                                    <TextBlock>Age</TextBlock>
+                                </StackPanel>
+                                <TextBox KeyDown="Enter_KeyDown" Name="tBox44"></TextBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="4" HorizontalAlignment="Stretch" Margin="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="cityCB"></CheckBox>
+                                    <TextBlock>City</TextBlock>
+                                </StackPanel>
+                                <TextBox KeyDown="Enter_KeyDown" Name="tBox45"></TextBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="5" HorizontalAlignment="Stretch" Margin="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="ratingCB"></CheckBox>
+                                    <TextBlock>Rating</TextBlock>
+                                </StackPanel>
+                                <TextBox KeyDown="Enter_KeyDown" Name="tBox46"></TextBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="6" HorizontalAlignment="Stretch" Margin="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="sizeCB"></CheckBox>
+                                    <TextBlock>Size</TextBlock>
+                                </StackPanel>
+                                <TextBox KeyDown="Enter_KeyDown" Name="tBox47"></TextBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="7" HorizontalAlignment="Stretch" Margin="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="qualityCB"></CheckBox>
+                                    <TextBlock>Quality</TextBlock>
+                                </StackPanel>
+                                <TextBox KeyDown="Enter_KeyDown" Name="tBox48"></TextBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="8" HorizontalAlignment="Stretch" Margin="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="durationCB"></CheckBox>
+                                    <TextBlock>Duration</TextBlock>
+                                </StackPanel>
+                                <TextBox KeyDown="Enter_KeyDown" Name="tBox49"></TextBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="9" HorizontalAlignment="Stretch" Margin="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="quantityCB"></CheckBox>
+                                    <TextBlock>Quantity</TextBlock>
+                                </StackPanel>
+                                <TextBox KeyDown="Enter_KeyDown" Name="tBox410" Text="1:"></TextBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="10" HorizontalAlignment="Stretch" Margin="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="Added"></CheckBox>
+                                    <TextBlock>Added</TextBlock>
+                                </StackPanel>
+                                <TextBox KeyDown="Enter_KeyDown" Name="tBox412" Text=""></TextBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="11" HorizontalAlignment="Stretch" Margin="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="Offline"></CheckBox>
+                                    <TextBlock>Offline</TextBlock>
+                                </StackPanel>
+                                <TextBox KeyDown="Enter_KeyDown" Name="tBox413" Text=""></TextBox>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" MinHeight="20">
+                        <TextBox KeyDown="tBox411_KeyDown" x:Name="tBox411"></TextBox>
+                    </StackPanel>
+                    <DataGrid AutoGeneratingColumn="OnAutoGeneratingColumn" RowEditEnding="DataGridGirlsInfo_RowEditEnding" SelectionChanged="DataGridGirlsInfo_SelectionChanged" Name="DataGridGirlsInfo" Grid.Row="2" MaxHeight="300" Margin="1,2,1,2" SelectionUnit="FullRow" SelectionMode="Extended" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" >
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Play All Videos" Click="Click_ToPlayAll"></MenuItem>
+                                <MenuItem Header="Play with duration in conditions" Click="Click_ToPlayWithDuraion"></MenuItem>
+                                <MenuItem Header="Open Folder" Click="Click_OpenFolder"></MenuItem>
+                                <MenuItem Header="Make and open html" Click="Click_ToMakeHtml"></MenuItem>
+                                <MenuItem Header="My Favorite" Click="Click_AddToFavorites"></MenuItem>
+                                <MenuItem Header="Download Girl" Click="Click_DownloadGirl"></MenuItem>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                    </DataGrid>
+                    <StackPanel Orientation="Horizontal" Grid.Row="3">
+                        <DataGrid Width="1300" ScrollViewer.CanContentScroll="True" ScrollViewer.VerticalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" SelectionUnit="FullRow" SelectionChanged="DataGridVideosInfo_SelectionChanged" Name="DataGridVideosInfo" Margin="5" SelectionMode="Extended">
+                            <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Play All Videos With PotPlayer" Click="Click_ToPlay"></MenuItem>
+                                <MenuItem Header="Open in chrome" Click="OpenInChrome_Play"></MenuItem>
+                                <MenuItem Header="Download file" Click="DownloadVideo_FromMenu"></MenuItem>
+                            </ContextMenu>
+                            </DataGrid.ContextMenu>
+                        </DataGrid>
+                        <Image Grid.Column="1"  Name="ImagePreview" MinHeight="360" Height="360" Margin="1"></Image>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </TabItem>
+    </TabControl>
+</Window>
