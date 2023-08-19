@@ -32,6 +32,7 @@ namespace CY
                         while (SQL.Read())
                         {
                             Girl girl = new Girl();
+                            girl.Id = (long)SQL["Id"];
                             girl.Name = (string)SQL["name"];
                             girl.City = (string)SQL["city"];
                             girl.AddDate = Convert.ToDateTime((string)SQL["adddate"]);
@@ -46,7 +47,7 @@ namespace CY
                             girl.Rating = Convert.ToInt32((decimal)SQL["rating"]);
                             girl.Views = Convert.ToInt32((decimal)SQL["views"]);
                             girl.Notes = SQL["notes"]==DBNull.Value?null:(string)SQL["notes"];
-                            girl.Id = Convert.ToInt32((decimal)SQL["linkid"]);
+                            girl.LinkId = Convert.ToInt32((decimal)SQL["linkid"]);
                             girl.Ava = (string)SQL["ava"];
                             girl.LastAccess = SQL["lastAccess"] == DBNull.Value ? null : (string)SQL["lastAccess"];
                             girl.LastUpdate = SQL["lastUpdate"] == DBNull.Value ? null : (string)SQL["lastUpdate"];

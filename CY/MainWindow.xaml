@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CY"
         mc:Ignorable="d"
-        Title="MainWindow" Height="800" Width="1600" Loaded="Window_Loaded" Closed="Window_Closed">
+        Title="MainWindow" Name="mainWindow" Height="800" Width="1600" Loaded="Window_Loaded" Closed="Window_Closed">
 
     <TabControl Width="Auto" Height="Auto" Margin="5,5,4.6,5" Background="#F8F51551" Grid.ColumnSpan="2" >
         <TabItem Name="Tab1" Width="Auto" Height="25" Header="Get All Girls" IsSelected="True">
@@ -42,7 +42,8 @@
                             <ColumnDefinition Width="1*"></ColumnDefinition>
                             <ColumnDefinition Width="1*"></ColumnDefinition>
                             <ColumnDefinition Width="1*"></ColumnDefinition>
-                            <ColumnDefinition Width="3*"></ColumnDefinition>
+                            <ColumnDefinition Width="1*"></ColumnDefinition>
+                            <ColumnDefinition Width="2*"></ColumnDefinition>
                             <ColumnDefinition Width="1*"></ColumnDefinition>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
@@ -63,12 +64,13 @@
                         <Button Grid.Row="1" Grid.Column="2" Content="Check Deleted"  x:Name="CheckDeleted" Click="CheckDeleted_Click"/>
                         <StackPanel Grid.Row="1" Grid.Column="0"  Orientation="Horizontal" >
                             <TextBlock x:Name="tBlock1" Text="Host" Grid.Row="1"></TextBlock>
-                            <TextBox x:Name="tBoxHost" Margin="1" MinWidth="150"  HorizontalAlignment="Left" Height="23" TextWrapping="Wrap" Text="" VerticalAlignment="Top" Width="120" TextChanged="tBoxHost_TextChanged"/>
+                            <TextBox x:Name="tBoxHost" Margin="1" MinWidth="150" Text="check-you.org" HorizontalAlignment="Left" Height="23" TextWrapping="Wrap" VerticalAlignment="Top" Width="120" TextChanged="tBoxHost_TextChanged"/>
                         </StackPanel>
                         <TextBlock x:Name="tBlockId" Text="Id" Grid.Row="1" Grid.RowSpan="2" Grid.Column="3" Height="40" TextWrapping="WrapWithOverflow" VerticalAlignment="Top"></TextBlock>
                         <TextBlock x:Name="tBlockCurrentId" Text="Id" Grid.Row="1" Grid.Column="4"></TextBlock>
-                        <Button Grid.Row="0" Grid.Column="3" Content="Update Database" IsEnabled="False" x:Name="UpdateDatabase" Click="UpdateDatabase_Click"/>
-                        <Button Grid.Row="0" Grid.Column="4" Content="Download All Girls"  x:Name="DownloadAllGirls" Click="DownloadAll_Click"/>
+                        <Button Grid.Row="0" Grid.Column="3" Content="Move From YAML To SQL" IsEnabled="False" x:Name="MoveToSQL" Click="MoveToSQL_Click"/>
+                        <Button Grid.Row="0" Grid.Column="4" Content="Update Database" IsEnabled="False" x:Name="UpdateDatabase" Click="UpdateDatabase_Click"/>
+                        <Button Grid.Row="0" Grid.Column="5" Content="Download All Girls"  x:Name="DownloadAllGirls" Click="DownloadAll_Click"/>
                     </Grid>
                 </StackPanel>
                 <StackPanel Grid.Row="1" Grid.Column="2">
@@ -111,8 +113,9 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" HorizontalAlignment="Stretch" Margin="1">
                                 <StackPanel Orientation="Horizontal">
-                                    <CheckBox x:Name="nameCB"></CheckBox>
+                                    <CheckBox x:Name="allowPreview" IsChecked="True"></CheckBox><!--It was Name-->
                                     <TextBlock>Name</TextBlock>
+                                    <TextBlock Name="TotalSelectedGirls" HorizontalAlignment="Right" >Вьіделено: 0</TextBlock>
                                 </StackPanel>
                                 <TextBox KeyDown="Enter_KeyDown" Name="tBox41"></TextBox>
                             </StackPanel>
@@ -127,6 +130,7 @@
                                 <StackPanel Orientation="Horizontal">
                                     <CheckBox x:Name="linkCB"></CheckBox>
                                     <TextBlock>Link</TextBlock>
+                                    <TextBlock HorizontalAlignment="Right" Name="status">Статус</TextBlock>
                                 </StackPanel>
                                 <TextBox KeyDown="Enter_KeyDown" Name="tBox43"></TextBox>
                             </StackPanel>
@@ -140,7 +144,7 @@
                             <StackPanel Grid.Column="4" HorizontalAlignment="Stretch" Margin="1">
                                 <StackPanel Orientation="Horizontal">
                                     <CheckBox x:Name="cityCB"></CheckBox>
-                                    <TextBlock>City</TextBlock>
+                                    <TextBlock Name="avaCurrent">Ава: </TextBlock>
                                 </StackPanel>
                                 <TextBox KeyDown="Enter_KeyDown" Name="tBox45"></TextBox>
                             </StackPanel>
@@ -160,7 +164,8 @@
                             </StackPanel>
                             <StackPanel Grid.Column="7" HorizontalAlignment="Stretch" Margin="1">
                                 <StackPanel Orientation="Horizontal">
-                                    <CheckBox x:Name="qualityCB"></CheckBox>
+                                    <CheckBox x:Name="withThumbnail"></CheckBox>
+                                    <TextBlock>With thumbnail</TextBlock>
                                     <TextBlock>Quality</TextBlock>
                                 </StackPanel>
                                 <TextBox KeyDown="Enter_KeyDown" Name="tBox48"></TextBox>
@@ -177,7 +182,7 @@
                                     <CheckBox x:Name="quantityCB"></CheckBox>
                                     <TextBlock>Quantity</TextBlock>
                                 </StackPanel>
-                                <TextBox KeyDown="Enter_KeyDown" Name="tBox410" Text="1:"></TextBox>
+                                <TextBox KeyDown="Enter_KeyDown" Name="tBox410" Text="0:"></TextBox>
                             </StackPanel>
                             <StackPanel Grid.Column="10" HorizontalAlignment="Stretch" Margin="1">
                                 <StackPanel Orientation="Horizontal">
@@ -207,11 +212,12 @@
                                 <MenuItem Header="Make and open html" Click="Click_ToMakeHtml"></MenuItem>
                                 <MenuItem Header="My Favorite" Click="Click_AddToFavorites"></MenuItem>
                                 <MenuItem Header="Download Girl" Click="Click_DownloadGirl"></MenuItem>
+                                <MenuItem Header="Update Girl" Click="Click_UpdateGirl"></MenuItem>
                             </ContextMenu>
                         </DataGrid.ContextMenu>
                     </DataGrid>
                     <StackPanel Orientation="Horizontal" Grid.Row="3">
-                        <DataGrid Width="1300" ScrollViewer.CanContentScroll="True" ScrollViewer.VerticalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" SelectionUnit="FullRow" SelectionChanged="DataGridVideosInfo_SelectionChanged" Name="DataGridVideosInfo" Margin="5" SelectionMode="Extended">
+                        <DataGrid Name="DataGridVideosInfo" Width="1300" RowEditEnding="DataGridVideosInfo_RowEditEnding" AutoGeneratingColumn="OnAutoGeneratingColumn" ScrollViewer.CanContentScroll="True" ScrollViewer.VerticalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" SelectionUnit="FullRow" SelectionChanged="DataGridVideosInfo_SelectionChanged" Margin="5" SelectionMode="Extended">
                             <DataGrid.ContextMenu>
                             <ContextMenu>
                                 <MenuItem Header="Play All Videos With PotPlayer" Click="Click_ToPlay"></MenuItem>

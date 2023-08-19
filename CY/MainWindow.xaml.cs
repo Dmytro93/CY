@@ -24,6 +24,9 @@ using System.Windows.Media;
 using Newtonsoft.Json;
 using System.Configuration;
 using System.Xml.Serialization;
+using System.Windows.Shapes;
+using Serilog;
+using System.Security.Policy;
 
 namespace CY
 {
@@ -32,6 +35,7 @@ namespace CY
         public string Username { get; set; }
         public string Password { get; set; }
         public string RootDatabaseFileFolder { get; set; }
+        public string Host { get; set; }
     }
     /// <summary>
     /// Логика взаимодействия для MainWindow.xaml
@@ -41,7 +45,7 @@ namespace CY
         public MainWindow()
         {
             InitializeComponent();
-            SettingsDeserializer();
+            Debug.WriteLine(DateTime.Now);
         }
         private void SettingsDeserializer()
         {
@@ -52,6 +56,9 @@ namespace CY
                 UserLogin = settings.Username;
                 UserPassword = settings.Password;
                 RootDatabaseFileFolder = settings.RootDatabaseFileFolder;
+                Host = "https://" + settings.Host;
+                Dispatcher.Invoke(() => LoginTB.Text = UserLogin);
+                Dispatcher.Invoke(() => PWTB.Password = UserPassword);
             }
         }
         string RootDatabaseFileFolder { get; set; }
@@ -64,9 +71,8 @@ namespace CY
         const string _userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:86.0) Gecko/20100101 Firefox/86.0";
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            SettingsDeserializer();
             MainFolderPath = FolderPath();
-            Mirror_or_nor();
-            Dispatcher.Invoke(() => NewHost = tBoxHost.Text);
             Uri uri = new Uri(Host);
             httpClient = new HttpClient(handler) { BaseAddress = uri };
             handler.CookieContainer = container;
@@ -94,6 +100,7 @@ namespace CY
                             {
                                 while (SQL.Read())
                                 {
+                                    Debug.WriteLine(SQL.GetString(0));
                                     db_girls_links.Add(SQL.GetString(0).Trim());
                                 }
                             }
@@ -104,10 +111,6 @@ namespace CY
             return db_girls_links;
         }
 
-        private async void DataGridVideosInfo_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            return;
-        }
         private async void DownloadVideo_FromMenu(object sender, RoutedEventArgs e)
         {
             var items = Dispatcher.Invoke(() => DataGridVideosInfo.SelectedItems);
@@ -174,7 +177,7 @@ namespace CY
                         }
                         totalBytesReceived = fileSize;
                         //else
-                        //    return;//Что-то сделать
+                        //    return;//Что-то сделатьBGetAllPages
                         requestMessage = new HttpRequestMessage(HttpMethod.Get, link);
                         requestMessage.Headers.Add("Range", $"bytes={fileSize}-{serverFileSize}");
                         var responseMessage = httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead).Result;
@@ -316,13 +319,13 @@ namespace CY
                     CMD.Parameters.Add("@images", System.Data.DbType.String).Value = string.Join("\n", girl.Images);
                     CMD.Parameters.Add("@videos", System.Data.DbType.String).Value = string.Join("\n", girl.Videos);
                     CMD.Parameters.Add("@dateofstate", System.Data.DbType.String).Value = girl.DateOfState.ToString("yyyy-MM-dd");
-                    CMD.Parameters.Add("@linkid", System.Data.DbType.Int32).Value = girl.Id;
+                    CMD.Parameters.Add("@linkid", System.Data.DbType.Int32).Value = girl.LinkId;
                     CMD.Parameters.Add("@link", System.Data.DbType.String).Value = girl.Link;
                     CMD.Parameters.Add("@birthdatestr", System.Data.DbType.String).Value = girl.BirthDateAsIs;
                     CMD.Parameters.Add("@views", System.Data.DbType.Int32).Value = girl.Views;
                     CMD.Parameters.Add("@rating", System.Data.DbType.Int32).Value = girl.Rating;
                     CMD.Parameters.Add("@ava", System.Data.DbType.String).Value = girl.Ava;
-                    CMD.Parameters.Add("@lastUpdate", System.Data.DbType.String).Value = DateTime.Now.ToString("yyyy-MM-dd");
+                    CMD.Parameters.Add("@lastUpdate", System.Data.DbType.String).Value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                     CMD.Parameters.Add("@lastAccess", System.Data.DbType.String).Value = DateTime.Now.ToString("yyyy-MM-dd");
                     CMD.ExecuteNonQuery();
                 }
@@ -392,10 +395,12 @@ namespace CY
                                 Thread.Sleep(30000);
                             }
                             Girl girl = To_list(l).Result;
+
                             DB_Write_Procedure(girl);
                             i++;
                         });
                     }
+
                 }
             });
         }
@@ -522,7 +527,7 @@ namespace CY
                     girl.AgeThen = Get_Age(girl.AddDate, girl.BirthDate);
                 girl.Images = fullpost_hrefs;
                 girl.Videos = srcs;
-                girl.Id = Convert.ToInt32(Regex.Match(girlLink, @"\/(\d{1,})-").Groups[1].Value);
+                girl.LinkId = Convert.ToInt32(Regex.Match(girlLink, @"\/(\d{1,})-").Groups[1].Value);
                 girl.Link = girlLink;
                 girl.Ava = ava;
                 girl.Views = views;
@@ -638,9 +643,6 @@ namespace CY
             }
         }
 
-        /// <summary>
-        /// m
-        /// </summary>
         private void GetVideoLinksFromDB()
         {
             VideoLinksToFile.IsEnabled = false;
@@ -705,6 +707,127 @@ namespace CY
             VideoLinksToFile.IsEnabled = true;
         }
         bool breaker;
+        private async Task<Video> UpdateVideoInfo(string videoLink)
+        {
+            Video video = new Video();
+            string[] result = await GetVideoProperties(videoLink);
+            video.Url = videoLink;
+            video.Duration = result[0];
+            video.Size = result[1];
+            video.Quality = result[2];
+            return video;
+        }
+        private async void MoveToSQL_Click(object sender, RoutedEventArgs e)
+        {
+            return;
+            await MoveFromYamlToSql();
+        }
+
+        private async Task MoveFromYamlToSql()
+        {
+            string fromFile = File.ReadAllText(ManageDataGrids.VideoGirlsPath);
+            VideoGirls videoGirls = YamlDeSerialize(fromFile);
+            string command = "select * from test";
+            var girlList = ManageDataGrids.ReturnGirlsInfo(command);
+            foreach (var girl in girlList.ListOfGirls)
+            {
+                var props = videoGirls.Properties.Where(x => x.GirlPage == girl.Link).ToList();
+                foreach (var prop in props)
+                {
+                    foreach (var video in prop.Videos)
+                        WriteVideoToSQL(girl.Id, video);
+                }
+            }
+        }
+        private void CheckVideoInTable()
+        {
+            List<long> ids = new List<long>();
+            using (DB = new SQLiteConnection($"Data Source={ManageDataGrids.DBPath}"))
+            {
+                DB.Open();
+                using (SQLiteCommand CMD = DB.CreateCommand())
+                {
+                    CMD.CommandText = "select id from Test";
+                    using (SQLiteDataReader SQL = CMD.ExecuteReader())
+                    {
+                        if (SQL.HasRows)
+                        {
+                            while (SQL.Read())
+                            {
+                                ids.Add(SQL.GetInt64(0));
+                            }
+                        }
+                    }
+                }
+            }
+            List<long> girlIds = new List<long>();
+            using (DB = new SQLiteConnection($"Data Source={ManageDataGrids.DBPath}"))
+            {
+                DB.Open();
+                using (SQLiteCommand CMD = DB.CreateCommand())
+                {
+                    CMD.CommandText = "select girl_id from videos";
+                    using (SQLiteDataReader SQL = CMD.ExecuteReader())
+                    {
+                        if (SQL.HasRows)
+                        {
+                            while (SQL.Read())
+                            {
+                                girlIds.Add((long)SQL["girl_id"]);
+                            }
+                        }
+                    }
+                }
+            }
+            List<long> newIds = ids.Except(girlIds).ToList();
+            foreach (long id in newIds)
+            {
+                List<Video> videos = new List<Video>();
+                using (DB = new SQLiteConnection($"Data Source={ManageDataGrids.DBPath}"))
+                {
+                    DB.Open();
+                    using (SQLiteCommand CMD = DB.CreateCommand())
+                    {
+                        CMD.CommandText = $"select videos from test where id == {id}";
+                        using (SQLiteDataReader SQL = CMD.ExecuteReader())
+                        {
+                            if (SQL.HasRows)
+                            {
+                                while (SQL.Read())
+                                {
+                                    string vidString = (string)SQL["videos"];
+                                    if (!string.IsNullOrEmpty(vidString))
+                                        vidString.Split('\n').ForEach(x => videos.Add(new Video() { Url = x, girlId = id }));
+                                    else
+                                        videos.Add(new Video() { Url = vidString, girlId = id });
+                                }
+                            }
+                        }
+                    }
+                }
+                videos.ForEach(x => WriteVideoToSQL(id, x));
+            }
+        }
+
+        private void WriteVideoToSQL(long girlId, Video video)
+        {
+            using (DB = new SQLiteConnection($"Data Source={ManageDataGrids.DBPath}"))
+            {
+                DB.Open();
+                using (SQLiteCommand CMD = DB.CreateCommand())
+                {
+                    CMD.CommandText = "insert into videos(url,filename,size,quality,duration,girl_id) " +
+                          "values(@url,@filename,@size,@quality,@duration,@girl_id)";
+                    CMD.Parameters.Add("@url", System.Data.DbType.String).Value = video.Url;
+                    CMD.Parameters.Add("@filename", System.Data.DbType.String).Value = video.Filename;
+                    CMD.Parameters.Add("@size", System.Data.DbType.String).Value = video.Size;
+                    CMD.Parameters.Add("@quality", System.Data.DbType.String).Value = video.Quality;
+                    CMD.Parameters.Add("@duration", System.Data.DbType.String).Value = video.Duration;
+                    CMD.Parameters.Add("@girl_id", System.Data.DbType.Int64).Value = girlId;
+                    CMD.ExecuteNonQuery();
+                }
+            }
+        }
         private async Task GetVideosInfo()
         {
             breaker = false;
@@ -752,7 +875,22 @@ namespace CY
                 GetVideosInfos.IsEnabled = true;
             }
         }
-
+        private async Task<string[]> GetVideoProperties(string url)
+        {
+            try
+            {
+                IMediaInfo mediaInfo = await FFmpeg.GetMediaInfo(url);
+                int width = mediaInfo.VideoStreams.Select(x => x.Width).First();
+                int heigth = mediaInfo.VideoStreams.Select(x => x.Height).First();
+                int quality = width > heigth ? width : heigth;
+                return new string[] { mediaInfo.Duration.ToString(), mediaInfo.Size.ToString(), quality.ToString() };
+            }
+            catch (Exception err)
+            {
+                Debug.WriteLine(err.Message);
+                return new string[] { "", "", "" };
+            }
+        }
         private async Task<string[]> GetVideoProperties(string url, string GirlPage)
         {
             try
@@ -795,11 +933,14 @@ namespace CY
 
         private void VideoLinksToFile_Click(object sender, RoutedEventArgs e)
         {
+            CheckVideoInTable();
+            return;
             GetVideoLinksFromDB();
         }
 
         private async void GetVideosInfos_Click(object sender, RoutedEventArgs e)
         {
+            return;
             GetVideosInfos.IsEnabled = false;
             await GetVideosInfo();
         }
@@ -954,51 +1095,93 @@ where (link like '%{tBox43.Text}%') and
             var pickedGirls = ManageDataGrids.ReturnGirlsInfo(tBox411.Text).ListOfGirls
                 .Where(x => CompareDates(x.BirthDate, x.AddDate)).ToList();
 
-            var links = pickedGirls.Select(x => x.Link);
-            VideoGirls videoGirls = YamlDeSerialize();
-            var pickedVideoInfos = new List<VideoProperties>();
-            foreach (string link in links)
+            var ids = pickedGirls.Select(x => x.Id);
+            List<Video> videos = GetVideosFromSQL();
+            List<Video> pickedVideos = new List<Video>();
+            IEnumerable<Video> pickedVideosTemp;
+            foreach (long id in ids)
             {
-                var temp = videoGirls.Properties.Where(x => x.GirlPage == link).FirstOrDefault();
+                var temp = videos.Where(x => x.girlId == id).FirstOrDefault();
                 if (temp != null)
-                    pickedVideoInfos.Add(temp);
+                    pickedVideos.Add(temp);
             }
             int quality = int.TryParse(tBox48.Text, out quality) ? quality : 0;
             long size = long.TryParse(tBox47.Text, out size) ? size : 0;
             TimeSpan duration = TimeSpan.FromMinutes(double.TryParse(Regex.Replace(tBox49.Text, @"[><=]{1}", ""), out double res) ? res : 0);
             //int.TryParse(Regex.Replace(tBox410.Text, @"[><=]{1}", ""), out int count);
             (int, int) desiredRange = DesiredCount(Dispatcher.Invoke(() => tBox410.Text));
-            IEnumerable<string> hasAnyVids;
-            if (desiredRange.Item1 == 0 && desiredRange.Item2 == 0)
-            {
-                hasAnyVids = pickedVideoInfos.Where(x => x.Videos.Count == 1 && string.IsNullOrEmpty(x.Videos[0].Url)).Select(x => x.GirlPage);
-            }
-            else if (desiredRange.Item1 == 0)
-            {
-                hasAnyVids = pickedVideoInfos.Select(x => x.GirlPage);
-            }
-            else
-            {
-                hasAnyVids = pickedVideoInfos.Where(x => !string.IsNullOrEmpty(x.Videos[0].Url) && IsVideosCountInRange(desiredRange, x.Videos.Count))
-                .Where(x => x.Videos
-                .Where(y => ((int.TryParse(y.Quality, out int intQuality) ? intQuality : 0) >= quality) &&
-                GetDurationRange(y.Quality, tBox49.Text, y.Duration))
-                .Count() > 0).Select(x => x.GirlPage);
-            }
+            IEnumerable<long> hasAnyVids;
+            pickedVideosTemp = pickedVideos.Where(y => ((int.TryParse(y.Quality, out int intQuality) ? intQuality : 0) >= quality));
+            if (withThumbnail.IsChecked == true)
+                pickedVideosTemp = pickedVideosTemp.Where(x => !string.IsNullOrWhiteSpace(x.Url) && File.Exists(Path.Combine("E:\\My_thumbnails", Path.GetFileName(x.Url) + ".jpg")));
+            hasAnyVids = pickedVideosTemp.Select(x=>x.girlId).ToList();
             List<Girl> girls = new List<Girl>();
             var state = GetGirlDownloadState();
-            foreach (string page in hasAnyVids)
+            foreach (long id in hasAnyVids)
             {
-                var temp = pickedGirls.Where(x => x.Link == page).FirstOrDefault();
+                var temp = pickedGirls.Where(x => x.Id == id).FirstOrDefault();
                 if (temp != null)
                     if (Offline.IsChecked == false)
                         girls.Add(temp);
                     else if (state[temp.Link])
                         girls.Add(temp);
             }
-            return girls.OrderByDescending(x => x.DateOfState).ToList();
+            return girls.OrderByDescending(x => x.LastUpdate).ToList();
 
         }
+        //private List<Girl> GetInfoByVideoProps()
+        //{
+        //    var pickedGirls = ManageDataGrids.ReturnGirlsInfo(tBox411.Text).ListOfGirls
+        //        .Where(x => CompareDates(x.BirthDate, x.AddDate)).ToList();
+
+        //    var links = pickedGirls.Select(x => x.Link);
+        //    VideoGirls videoGirls = YamlDeSerialize();
+        //    List<VideoProperties> pickedVideoInfos = new List<VideoProperties>();
+        //    IEnumerable<VideoProperties> filteredVideoInfos;
+        //    foreach (string link in links)
+        //    {
+        //        var temp = videoGirls.Properties.Where(x => x.GirlPage == link).FirstOrDefault();
+        //        if (temp != null)
+        //            pickedVideoInfos.Add(temp);
+        //    }
+        //    int quality = int.TryParse(tBox48.Text, out quality) ? quality : 0;
+        //    long size = long.TryParse(tBox47.Text, out size) ? size : 0;
+        //    TimeSpan duration = TimeSpan.FromMinutes(double.TryParse(Regex.Replace(tBox49.Text, @"[><=]{1}", ""), out double res) ? res : 0);
+        //    //int.TryParse(Regex.Replace(tBox410.Text, @"[><=]{1}", ""), out int count);
+        //    (int, int) desiredRange = DesiredCount(Dispatcher.Invoke(() => tBox410.Text));
+        //    IEnumerable<string> hasAnyVids;
+        //    if (desiredRange.Item1 == 0 && desiredRange.Item2 == 0)
+        //    {
+        //        hasAnyVids = pickedVideoInfos.Where(x => x.Videos.Count == 1 && string.IsNullOrEmpty(x.Videos[0].Url)).Select(x => x.GirlPage);
+        //    }
+        //    else if (desiredRange.Item1 == 0)
+        //    {
+        //        hasAnyVids = pickedVideoInfos.Select(x => x.GirlPage);
+        //    }
+        //    else
+        //    {
+        //        if (withThumbnail.IsChecked == true)
+        //            filteredVideoInfos = pickedVideoInfos.Where(x => !string.IsNullOrWhiteSpace(x.Videos[0].Url) && File.Exists(Path.Combine("E:\\My_thumbnails", Path.GetFileName(x.Videos[0].Url) + ".jpg")) && IsVideosCountInRange(desiredRange, x.Videos.Count));
+        //        else
+        //            filteredVideoInfos = pickedVideoInfos.Where(x => !string.IsNullOrWhiteSpace(x.Videos[0].Url) && !File.Exists(Path.Combine("E:\\My_thumbnails", Path.GetFileName(x.Videos[0].Url) + ".jpg")) && IsVideosCountInRange(desiredRange, x.Videos.Count));
+        //        hasAnyVids = filteredVideoInfos.Where(x => x.Videos.Where(y => ((int.TryParse(y.Quality, out int intQuality) ? intQuality : 0) >= quality) &&
+        //GetDurationRange(y.Quality, tBox49.Text, y.Duration))
+        //.Count() > 0).Select(x => x.GirlPage);
+        //    }
+        //    List<Girl> girls = new List<Girl>();
+        //    var state = GetGirlDownloadState();
+        //    foreach (string page in hasAnyVids)
+        //    {
+        //        var temp = pickedGirls.Where(x => x.Link == page).FirstOrDefault();
+        //        if (temp != null)
+        //            if (Offline.IsChecked == false)
+        //                girls.Add(temp);
+        //            else if (state[temp.Link])
+        //                girls.Add(temp);
+        //    }
+        //    return girls.OrderByDescending(x => x.LastUpdate).ToList();
+
+        //}
         private bool IsVideosCountInRange((int, int) minMax, int girlCount)
         {
             int min, max;
@@ -1147,20 +1330,20 @@ where (link like '%{tBox43.Text}%') and
             try
             {
                 DataGridGirlsInfo.ItemsSource = GetInfoByVideoProps();
-                DataGridGirlsInfo.Columns[0].Width = new DataGridLength(150);
-                DataGridGirlsInfo.Columns[1].Width = new DataGridLength(200);
-                DataGridGirlsInfo.Columns[2].Visibility = Visibility.Collapsed;
+                DataGridGirlsInfo.Columns[1].Width = new DataGridLength(150);
+                DataGridGirlsInfo.Columns[2].Width = new DataGridLength(200);
+                DataGridGirlsInfo.Columns[3].Visibility = Visibility.Collapsed;
                 //DataGridGirlsInfo.Columns[5].Visibility = Visibility.Collapsed;
                 //DataGridGirlsInfo.Columns[7].Visibility = Visibility.Collapsed;
-                DataGridGirlsInfo.Columns[8].Visibility = Visibility.Collapsed;
-                DataGridGirlsInfo.Columns[12].Visibility = Visibility.Collapsed;
-                DataGridGirlsInfo.Columns[14].Visibility = Visibility.Collapsed;
+                DataGridGirlsInfo.Columns[9].Visibility = Visibility.Collapsed;
+                DataGridGirlsInfo.Columns[13].Visibility = Visibility.Collapsed;
                 DataGridGirlsInfo.Columns[15].Visibility = Visibility.Collapsed;
-                DataGridGirlsInfo.Columns[13].Width = new DataGridLength(150);
+                DataGridGirlsInfo.Columns[16].Visibility = Visibility.Collapsed;
+                DataGridGirlsInfo.Columns[14].Width = new DataGridLength(150);
             }
-            catch
+            catch (Exception err)
             {
-
+                MessageBox.Show(err.Message);
             }
             //CheckBox[] checkBox = new CheckBox[] { nameCB, birthDateCB, linkCB, ageThenCB, cityCB, ratingCB };            
         }
@@ -1176,7 +1359,7 @@ where (link like '%{tBox43.Text}%') and
         private static string player = @"C:\Program Files\DAUM\PotPlayer\PotPlayerMini64.exe";
         private async void Click_ToPlay(object sender, RoutedEventArgs e)
         {
-            await Task.Run(() => TryStartPlaylist());
+            await Task.Run(() => TryStartPlaylist(true));
         }
         private void Click_AddToFavorites(object sender, RoutedEventArgs e)
         {
@@ -1192,8 +1375,13 @@ where (link like '%{tBox43.Text}%') and
             }
 
         }
-        private void TryStartPlaylist()
+        private void TryStartPlaylist(bool fromVideoDataGrid = false)
         {
+            if (fromVideoDataGrid)
+            {
+                if (Dispatcher.Invoke(() => DataGridVideosInfo.SelectedItems) != null)
+                    ForPlaylist = Dispatcher.Invoke(() => DataGridVideosInfo.SelectedItems).OfType<Video>().ToList();
+            }
             string daumPlaylistTemplayer = $"DAUMPLAYLIST\n" +
                     $"playname = %REPLACE%\n" +
                     $"topindex = 0\n" +
@@ -1230,27 +1418,42 @@ where (link like '%{tBox43.Text}%') and
             File.WriteAllText($@"{playListFileName}", daumPlaylistTemplayer);
             Process.Start(player, playListFileName);
         }
+        private async Task GoThroughTheImages(List<Video> videos)
+        {
+            foreach (var x in videos)
+            {
+                string thumbnail = Path.Combine(@"E:\My_thumbnails", Path.GetFileName(x.Url) + ".jpg");
+                Dispatcher.Invoke(() => LoadImage(thumbnail));
+                await Task.Delay(300);
+            }
+        }
         private async void DataGridGirlsInfo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             try
             {
-                int count;
-                Girl selected;
-                if ((count = DataGridGirlsInfo.SelectedItems.Count) == 1)
-                    selected = DataGridGirlsInfo.SelectedItem as Girl;
-                else
+
+                if (DataGridGirlsInfo.SelectedItems is null)
+                {
+                    Dispatcher.Invoke(() => TotalSelectedGirls.Text = $"Вьіделено: 0");
                     return;
-                if (selected is null)
+                }
+                int count = DataGridGirlsInfo.SelectedItems.Count;
+                Dispatcher.Invoke(() => TotalSelectedGirls.Text = $"Вьіделено: {count}");
+                //TODO изменить логику
+                Girl lastSelected = DataGridGirlsInfo.SelectedItems[0] as Girl;
+                if (lastSelected is null)
                     return;
-                var girlVideoInfo = YamlDeSerialize().Properties.Where(x => x.GirlPage == selected.Link).FirstOrDefault();
-                var temp = girlVideoInfo.Videos.Where(y => !string.IsNullOrWhiteSpace(y.Duration)).ToList();
-                temp.ForEach(x =>
-            {
-                x.Size = (long.TryParse(x.Size, out long res) ? res / 1024 / 1024 : 0).ToString();
-            });
-                ForPlaylist = temp;
+                var girlVideoInfo = GetVideosFromSQL().Where(x => x != null && x.girlId == lastSelected.Id).ToList();
+                // TODO IGNORING
+                //    temp.ForEach(x =>
+                //{
+                //    x.Size = (long.TryParse(x.Size, out long res) ? res / 1024 / 1024 : 0).ToString();
+                //});
+                ForPlaylist = girlVideoInfo;
                 DataGridVideosInfo.ItemsSource = ForPlaylist;
-                await ShowImage(selected.Ava);
+                await ShowImage(lastSelected);
+                //TODO предпросмотр
+                //await GoThroughTheImages(temp);
             }
             catch (Exception exc)
             {
@@ -1265,11 +1468,12 @@ where (link like '%{tBox43.Text}%') and
                 await streamToReadFrom.CopyToAsync(streamToWriteTo);
 
         }
-        private async Task ShowImage(string url)
+        private async Task ShowImage(Girl girl)
         {
-            Debug.WriteLine(url);
-            string filePath = Path.Combine(ManageDataGrids.FilesFolder, Path.GetFileName(url));
-            Debug.WriteLine(filePath);
+            string url = girl.Ava;
+            //Debug.WriteLine(url);
+            string filePath = Path.Combine(Path.GetDirectoryName(System.AppDomain.CurrentDomain.BaseDirectory), ManageDataGrids.FilesFolder, Path.GetFileName(url));
+            //Debug.WriteLine(filePath);
             if (!File.Exists(filePath))
             {
                 await DownloadImage(url, filePath);
@@ -1283,6 +1487,7 @@ where (link like '%{tBox43.Text}%') and
             bi3.EndInit();
             ImagePreview.Stretch = Stretch.UniformToFill;
             ImagePreview.Source = bi3;
+            await Dispatcher.InvokeAsync(() => avaCurrent.Text = $"Ава:{girl.Name}");
 
         }
         private async void Click_ToPlayAll(object sender, RoutedEventArgs e)
@@ -1301,7 +1506,8 @@ where (link like '%{tBox43.Text}%') and
         {
             await Task.Run(() =>
             {
-                var videos = ManySelectedVideos(withDuration);
+                //TODO переделать избавиться от дубликатов
+                var videos = ManySelectedVideos(withDuration).Distinct(x => x).ToList();
                 TryStartPlaylist(videos);
             });
         }
@@ -1318,7 +1524,7 @@ where (link like '%{tBox43.Text}%') and
         private List<Video> ManySelectedVideos(bool withDuration)
         {
             string duration = withDuration ? Dispatcher.Invoke(() => tBox49.Text) : "0";
-            VideoGirls videoGirls = YamlDeSerialize();
+            var videoList = GetVideosFromSQL();
             List<Video> videos = new List<Video>();
             var state = GetGirlDownloadState();
             var selecteds = Dispatcher.Invoke(() => DataGridGirlsInfo.SelectedItems);
@@ -1328,15 +1534,15 @@ where (link like '%{tBox43.Text}%') and
                 if (result == null || string.IsNullOrEmpty(result.Link))
                     continue;
                 ComparingSign sign = ReturnComparingSign(Dispatcher.Invoke(() => tBox49.Text));
-                var vids = videoGirls.Properties.Where(x => x.GirlPage == result.Link).First().Videos
-                    .Where(y => GetDurationRange(y.Quality, duration, y.Duration));
                 string girlFolder = Path.GetFileNameWithoutExtension(result.Link);
-                if (state[result.Link] && Dispatcher.Invoke(() => Offline.IsChecked == true))
-                    videos.AddRange(vids
-                        .Select(x =>
-                        new Video()
-                        { Url = Path.Combine(Path.Combine(RootDatabaseFileFolder, girlFolder, "videos", Path.GetFileName(x.Url))) }));
-                else if (!state[result.Link] && Dispatcher.Invoke(() => Offline.IsChecked == true))
+                //TODO Ignoring
+                if (!withDuration)
+                    videos.AddRange(videoList.Where(x => x.girlId == result.Id));
+                var vids = videoList.Where(x => x.girlId == result.Id && !string.IsNullOrEmpty(x.Url))
+                    .Where(y => GetDurationRange(y.Quality, duration, y.Duration));
+                if (Dispatcher.Invoke(() => Offline.IsChecked == true) && state[result.Link])
+                    videos.AddRange(vids.Select(x => new Video() { Url = Path.Combine(Path.Combine(RootDatabaseFileFolder, girlFolder, "videos", Path.GetFileName(x.Url))) }));
+                else if (Dispatcher.Invoke(() => Offline.IsChecked == true) && !state[result.Link])
                     continue;
                 else
                     videos.AddRange(vids);
@@ -1544,6 +1750,16 @@ where (link like '%{tBox43.Text}%') and
                 updateGirl.Notify += AsyncEvent;
             }
         }
+        Video updateVideo;
+        private void DataGridVideosInfo_RowEditEnding(object sender, DataGridRowEditEndingEventArgs e)
+        {
+            var t = e.Row.Item;
+            if (t is Video)
+            {
+                updateVideo = t as Video;
+                updateVideo.Notify += AsyncEvent;
+            }
+        }
         private Dictionary<string, bool> GetGirlDownloadState()
         {
             Dictionary<string, bool> values = new Dictionary<string, bool>();
@@ -1749,6 +1965,407 @@ where (link like '%{tBox43.Text}%') and
 
 
         }
+        private async void Click_UpdateGirl(object sender, RoutedEventArgs e)
+        {
+            await UpdateGirlVideoInfo();
+        }
+
+        private async Task MakeThumbnailsCmd(string url, string title)
+        {
+            await Task.Run(() =>
+            {
+                var process = new Process
+                {
+                    StartInfo =
+                {
+                    FileName = "cmd",
+                    Arguments = "/C python \"G:\\Мій диск\\DOCS\\Visual Studio Code\\old_files\\thumbnails_maker.py\" " +
+        "-l " + url,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+                };
+                process.Start();
+                string thumbnailPath = Path.Combine("E:\\My_thumbnails", Path.GetFileName(url) + ".jpg");
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
+                while (true)
+                {
+                    if (sw.ElapsedMilliseconds > 40000)
+                        break;
+                    if (File.Exists(thumbnailPath))
+                    {
+                        Dispatcher.Invoke(() => LoadImage(thumbnailPath, title));
+                        break;
+                    }
+                    Task.Delay(300);
+                }
+            });
+        }
+        ImgPreview imgPreview;
+        private async void DataGridVideosInfo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var items = DataGridVideosInfo.SelectedItems;
+            if (items == null || items.Count < 1)
+                return;
+            if (items[items.Count - 1].ToString() == "{NewItemPlaceholder}")
+                return;
+            var item = items[items.Count - 1] as Video;
+            //string name_wo_ext = Path.GetFileNameWithoutExtension(item.Title);
+            string thumbnail = Path.Combine(@"E:\My_thumbnails", Path.GetFileName(item.Url) + ".jpg");
+            Dispatcher.Invoke(() => LoadImage(thumbnail));
+        }
+        private void LoadImage(string thumbnail, string title = "ImgPreview")
+        {
+            Debug.WriteLine(title);
+            if (File.Exists(thumbnail))
+            {
+                if (Dispatcher.Invoke(() => allowPreview.IsChecked) == false)
+                    return;
+                if (imgPreview == null)
+                {
+                    imgPreview = new ImgPreview();
+                    imgPreview.WindowStartupLocation = WindowStartupLocation.Manual;
+                    imgPreview.Left = 1920 - 800;
+                    imgPreview.Top = 0;
+                    imgPreview.Show();
+                    imgPreview.Closed += ImgPreview_Closed;
+                    imgPreview.Deactivated += ImgPreview_Deactivated;
+                    //mainWindow.Activate();
+                }
+                imgPreview.Title = title;
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
+                while (true)
+                {
+                    try
+                    {
+                        var bytes = File.ReadAllBytes(thumbnail);
+                        imgPreview.image1.Source = ToImage(bytes);
+                        break;
+                    }
+                    catch(Exception err)
+                    {
+                        if (sw.ElapsedMilliseconds > 1000)
+                            break;
+                        //Debug.WriteLine(sw.ElapsedMilliseconds);
+                    }
+
+                }
+
+                //imgPreview.image1.Source = new BitmapImage(new Uri("file:///" + thumbnail.Replace("#", @"%23")));
+            }
+            else
+            {
+                if (Dispatcher.Invoke(() => allowPreview.IsChecked) == false)
+                    return;
+                if (imgPreview == null)
+                {
+                    imgPreview = new ImgPreview();
+                    imgPreview.WindowStartupLocation = WindowStartupLocation.Manual;
+                    imgPreview.Left = 1920 - 800;
+                    imgPreview.Top = 0;
+                    imgPreview.Show();
+                    imgPreview.Closed += ImgPreview_Closed;
+                    imgPreview.Deactivated += ImgPreview_Deactivated;
+                    //mainWindow.Activate();
+                }
+                imgPreview.image1.Source = CreateBitmapImage();
+            }
+        }
+        public BitmapImage ToImage(byte[] array)
+        {
+            using (var ms = new System.IO.MemoryStream(array))
+            {
+                var image = new BitmapImage();
+                image.BeginInit();
+                image.CacheOption = BitmapCacheOption.OnLoad; // here
+                image.StreamSource = ms;
+                image.EndInit();
+                return image;
+            }
+        }
+        private BitmapSource CreateBitmapImage()
+        {
+            int width = 800;
+            int height = width;
+            int stride = width / 8;
+            byte[] pixels = new byte[height * stride];
+
+            // Try creating a new image with a custom palette.
+            List<System.Windows.Media.Color> colors = new List<System.Windows.Media.Color>();
+            colors.Add(System.Windows.Media.Colors.Black);
+            BitmapPalette myPalette = new BitmapPalette(colors);
+
+            // Creates a new empty image with the pre-defined palette
+            BitmapSource image = BitmapSource.Create(
+                                                     width, height,
+                                                     96, 96,
+                                                     PixelFormats.Indexed1,
+                                                     myPalette,
+                                                     pixels,
+                                                     stride);
+            return image;
+        }
+        private void ImgPreview_Closed(object sender, EventArgs e)
+        {
+            imgPreview = null;
+        }
+        private void ImgPreview_Deactivated(object sender, EventArgs e)
+        {
+
+            Window window = (Window)sender;
+            if (mainWindow.IsActive)
+                window.Topmost = true;
+            else
+                window.Topmost = false;
+        }
+        private List<Video> GetVideosFromSQL()
+        {
+            List<Video> list = new List<Video>();
+            using (DB = new SQLiteConnection($"Data Source={ManageDataGrids.DBPath}"))
+            {
+                DB.Open();
+                using (SQLiteCommand CMD = DB.CreateCommand())
+                {
+                    CMD.CommandText = "select * from videos";
+                    using (SQLiteDataReader SQL = CMD.ExecuteReader())
+                    {
+                        if (SQL.HasRows)
+                        {
+                            while (SQL.Read())
+                            {
+                                Video video = new Video();
+                                video.Url = SQL["url"] == DBNull.Value ? null : SQL.GetString(1);
+                                video.Size = SQL["size"] == DBNull.Value ? null : SQL.GetString(3);
+                                video.Quality = SQL["quality"] == DBNull.Value ? null : SQL.GetString(4);
+                                video.Duration = SQL["duration"] == DBNull.Value ? null : SQL.GetString(5);
+                                video.Notes = SQL["Notes"] == DBNull.Value ? null : SQL.GetString(6);
+                                video.girlId = SQL.GetInt64(7);
+                                list.Add(video);
+                            }
+                        }
+                    }
+                }
+            }
+            return list;
+        }
+        private void UpdateVideoInfo(Video video)
+        {
+            using (DB = new SQLiteConnection($"Data Source={ManageDataGrids.DBPath}"))
+            {
+                DB.Open();
+                using (SQLiteCommand CMD = DB.CreateCommand())
+                {
+                    CMD.CommandText = $"update videos " +
+                        $"set " +
+                        $"url = '{video.Url}', " +
+                        $"size = '{video.Size}', " +
+                        $"quality = '{video.Quality}', " +
+                        $"duration = '{video.Duration}' " +
+                        $"where filename == '{video.Filename}'";
+                    Debug.WriteLine(CMD.CommandText);
+                    CMD.ExecuteNonQuery();
+                }
+            }
+        }
+
+
+        private async Task UpdateGirlVideoInfo()
+        {
+            if (DataGridGirlsInfo.SelectedItem == null)
+                return;
+            var temp = DataGridGirlsInfo.SelectedItems;
+            List<Girl> items;
+            temp.Remove(null);
+            items = temp.OfType<Girl>().ToList();
+            int count = items.Count;
+            var result = MessageBox.Show("Update only where there is no thumbnail?", "What to do?", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            await Login(true);
+            List<Video> videos = GetVideosFromSQL();
+            for (int i = 0; i < count; i++)
+            {
+                var girl = items[i] as Girl;
+                string link = girl.Link;
+                if (result == MessageBoxResult.Yes)
+                {
+                    bool thumbnailStatus = false;
+                    foreach (string vid in girl.Videos)
+                    {
+                        string thumbnailPath = Path.Combine("E:\\My_thumbnails", Path.GetFileName(vid) + ".jpg");
+                        if (!File.Exists(thumbnailPath))
+                            thumbnailStatus = true;
+                    }
+                    if (!thumbnailStatus)
+                        continue;
+                }
+                var updatedGirl = await To_list(girl.Link);
+                if (updatedGirl == null)
+                    return;
+
+                if (videos.Any(x => x.girlId == girl.Id))
+                {
+                    foreach (var newVideo in updatedGirl.Videos)
+                    {
+                        bool flag = false;
+                        foreach (var video in videos.Where(x => x.girlId == girl.Id))
+                        {
+                            var mx = Regex.Match(newVideo, @"\/video\d?\/(.+?.mp4)").Groups[1].Value;
+                            var murl = Regex.Match(video.Url, @"\/video\d?\/(.+?.mp4)").Groups[1].Value;
+                            if (mx == murl)
+                            {
+                                Video updatedVideo;
+                                if (string.IsNullOrEmpty(video.Duration))
+                                {
+                                    updatedVideo = await UpdateVideoInfo(newVideo);
+                                    updatedVideo.girlId = girl.Id;
+                                }
+                                else
+                                    updatedVideo = new Video() { Url = newVideo, Duration = video.Duration, Quality = video.Quality, Size = video.Size, girlId = video.girlId };
+                                //
+                                string thumbnailPath = Path.Combine("E:\\My_thumbnails", Path.GetFileName(updatedVideo.Url) + ".jpg");
+                                if (!File.Exists(thumbnailPath))
+                                {
+                                    Debug.WriteLine(updatedVideo.Url);
+                                    await MakeThumbnailsCmd(updatedVideo.Url, updatedGirl.Name);
+                                }
+                                UpdateVideoInfo(updatedVideo);
+                                flag = true;
+                                break;
+                            }
+
+                        }
+                        if (!flag)
+                        {
+                            WriteVideoToSQL(girl.Id, new Video() { Url = newVideo, girlId = girl.Id });
+                        }
+                    }
+                }
+                else
+                {
+                    //TODO лишнее мьі добавляем видео раньше
+                }
+                using (DB = new SQLiteConnection($"Data Source={ManageDataGrids.DBPath}"))
+                {
+                    DB.Open();
+                    using (SQLiteCommand CMD = DB.CreateCommand())
+                    {
+                        CMD.CommandText = $"UPDATE test SET videos='{string.Join("\n", updatedGirl.Videos)}' WHERE Link='{girl.Link}'";
+                        CMD.ExecuteNonQuery();
+                    }
+                    using (SQLiteCommand CMD = DB.CreateCommand())
+                    {
+                        CMD.CommandText = $"UPDATE test SET lastUpdate='{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}' WHERE linkid='{girl.LinkId}'";
+                        CMD.ExecuteNonQuery();
+                    }
+                }
+                Dispatcher.Invoke(() => status.Text = $" {i + 1}/{count} " + girl.Name + " " + DateTime.Now.ToString("HH:mm:ss"));
+            }
+        }
+
+        //private async Task UpdateGirlVideoInfo()
+        //{
+        //    if (DataGridGirlsInfo.SelectedItem == null)
+        //        return;
+        //    var items = DataGridGirlsInfo.SelectedItems.Cast<Girl>().ToList();
+        //    int count = items.Count;
+        //    var result = MessageBox.Show("Update only where there is no thumbnail?", "What to do?", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        //    await Login(true);
+        //    for (int i = 0; i < count; i++)
+        //    {
+        //        var girl = items[i] as Girl;
+        //        string link = girl.Link;
+        //        if (result == MessageBoxResult.Yes)
+        //        {
+        //            bool thumbnailStatus = false;
+        //            foreach (string vid in girl.Videos)
+        //            {
+        //                string thumbnailPath = Path.Combine("E:\\My_thumbnails", Path.GetFileName(vid) + ".jpg");
+        //                if (!File.Exists(thumbnailPath))
+        //                    thumbnailStatus = true;
+        //            }
+        //            if (!thumbnailStatus)
+        //                continue;
+        //        }
+        //        var updatedGirl = await To_list(girl.Link);
+        //        if (updatedGirl == null)
+        //            return;
+        //        VideoGirls videoGirls = YamlDeSerialize();
+        //        List<Video> videos = new List<Video>();
+        //        VideoProperties properties = new VideoProperties();
+        //        if (videoGirls.Properties.Any(x => x.GirlPage == link))
+        //        {
+        //            properties = videoGirls.Properties.Where(x => x.GirlPage == link).First();
+        //            var item = videoGirls.Properties.FirstOrDefault(x => x.GirlPage == link);
+        //            videoGirls.Properties.Remove(item);
+        //            foreach (var newVideo in updatedGirl.Videos)
+        //            {
+        //                bool flag = false;
+        //                foreach (var video in properties.Videos)
+        //                {
+        //                    var mx = Regex.Match(newVideo, @"\/video\d?\/(.+?.mp4)").Groups[1].Value;
+        //                    var murl = Regex.Match(video.Url, @"\/video\d?\/(.+?.mp4)").Groups[1].Value;
+        //                    if (mx == murl)
+        //                    {
+        //                        Debug.WriteLine("new " + newVideo + " old " + video.Url);
+        //                        var deleteThis = properties.Videos.Where(y => y.Url == video.Url).FirstOrDefault();
+        //                        Video updatedVideo;
+        //                        if (string.IsNullOrEmpty(video.Duration))
+        //                        {
+        //                            updatedVideo = await UpdateVideoInfo(newVideo);
+        //                        }
+        //                        else
+        //                            updatedVideo = new Video() { Url = newVideo, Duration = video.Duration, Quality = video.Quality, Size = video.Size };
+        //                        //
+        //                        string thumbnailPath = Path.Combine("E:\\My_thumbnails", Path.GetFileName(updatedVideo.Url) + ".jpg");
+        //                        if (!File.Exists(thumbnailPath))
+        //                        {
+        //                            Debug.WriteLine(updatedVideo.Url);
+        //                            await MakeThumbnailsCmd(updatedVideo.Url, updatedGirl.Name);
+        //                        }
+        //                        //
+        //                        properties.Videos.Remove(deleteThis);
+        //                        properties.Videos.Add(updatedVideo);
+        //                        flag = true;
+        //                        break;
+        //                    }
+
+        //                }
+        //                if (!flag)
+        //                {
+        //                    properties.Videos.Add(new Video() { Url = newVideo });
+        //                }
+        //            }
+        //        }
+        //        else
+        //        {
+        //            properties.GirlPage = link;
+        //            updatedGirl.Videos.ForEach(x =>
+        //            {
+        //                properties.Videos.Add(new Video() { Url = x });
+        //            });
+        //        }
+        //        videoGirls.Properties.Add(properties);
+        //        YamlSerialize(videoGirls);
+        //        using (DB = new SQLiteConnection($"Data Source={ManageDataGrids.DBPath}"))
+        //        {
+        //            DB.Open();
+        //            using (SQLiteCommand CMD = DB.CreateCommand())
+        //            {
+        //                CMD.CommandText = $"UPDATE test SET videos='{string.Join("\n", updatedGirl.Videos)}' WHERE Link='{girl.Link}'";
+        //                CMD.ExecuteNonQuery();
+        //            }
+        //            using (SQLiteCommand CMD = DB.CreateCommand())
+        //            {
+        //                CMD.CommandText = $"UPDATE test SET lastUpdate='{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}' WHERE linkid='{girl.LinkId}'";
+        //                CMD.ExecuteNonQuery();
+        //            }
+        //        }
+        //        Dispatcher.Invoke(() => status.Text = $" {i + 1}/{count} " + girl.Name + " " + DateTime.Now.ToString("HH:mm:ss"));
+        //    }
+        //}
         private async Task ListDownload(IEnumerable<string> imageLinkArray, string folderPath)
         {
             await Task.Run(() =>
@@ -1779,6 +2396,8 @@ where (link like '%{tBox43.Text}%') and
                 return false;
             var girl = girls.ListOfGirls[0];
             var newInfo = To_list(girl.Link).Result;
+            if (newInfo is null)
+                return false;
             girl.Videos = newInfo.Videos;
             string girlFolder = Path.GetFileNameWithoutExtension(girl.Link);
             Directory.CreateDirectory(Path.Combine(RootDatabaseFileFolder, girlFolder));
@@ -1793,7 +2412,7 @@ where (link like '%{tBox43.Text}%') and
         {
             await Task.Run(() =>
             {
-                using (DB = new SQLiteConnection($"Data Source={ManageDataGrids.DBPath}"))
+                using (DB = new SQLiteConnection($"Data Source={ManageDataGrids.DBPath};Journal Mode=Off"))
                 {
                     DB.Open();
                     using (SQLiteCommand CMD = DB.CreateCommand())
@@ -1804,7 +2423,21 @@ where (link like '%{tBox43.Text}%') and
                 }
             });
         }
-
+        private async void AsyncEvent(Video video)
+        {
+            await Task.Run(() =>
+            {
+                using (DB = new SQLiteConnection($"Data Source={ManageDataGrids.DBPath};Journal Mode=Off"))
+                {
+                    DB.Open();
+                    using (SQLiteCommand CMD = DB.CreateCommand())
+                    {
+                        CMD.CommandText = $"UPDATE videos SET Notes='{video.Notes?.ToUpper()}' WHERE Url='{video.Url}'";
+                        CMD.ExecuteNonQuery();
+                    }
+                }
+            });
+        }
         private void UpdateGirl(Girl girl, bool onlyUpdatedField = false)
         {
             try
@@ -1812,9 +2445,9 @@ where (link like '%{tBox43.Text}%') and
                 using (SQLiteCommand CMD = DB.CreateCommand())
                 {
                     if (!onlyUpdatedField)
-                        CMD.CommandText = $"UPDATE test SET lastUpdate='{DateTime.Now + TimeSpan.FromDays(14):yyyy-MM-dd}' WHERE linkid='{girl.Id}'";
+                        CMD.CommandText = $"UPDATE test SET lastUpdate='{DateTime.Now + TimeSpan.FromDays(14):yyyy-MM-dd}' WHERE linkid='{girl.LinkId}'";
                     else
-                        CMD.CommandText = $"UPDATE test SET notes='update', lastUpdate='{DateTime.MaxValue.ToString("yyyy-MM-dd")}' WHERE linkid='{girl.Id}'";
+                        CMD.CommandText = $"UPDATE test SET notes='update', lastUpdate='{DateTime.MaxValue.ToString("yyyy-MM-dd")}' WHERE linkid='{girl.LinkId}'";
                     CMD.ExecuteNonQuery();
                 }
             }
@@ -1839,14 +2472,14 @@ where (link like '%{tBox43.Text}%') and
                 CMD.Parameters.Add("@images", System.Data.DbType.String).Value = string.Join("\n", girl.Images);
                 CMD.Parameters.Add("@videos", System.Data.DbType.String).Value = string.Join("\n", girl.Videos);
                 CMD.Parameters.Add("@dateofstate", System.Data.DbType.String).Value = girl.DateOfState.ToString("yyyy-MM-dd");
-                CMD.Parameters.Add("@linkid", System.Data.DbType.Int32).Value = girl.Id;
+                CMD.Parameters.Add("@linkid", System.Data.DbType.Int32).Value = girl.LinkId;
                 CMD.Parameters.Add("@link", System.Data.DbType.String).Value = girl.Link;
                 CMD.Parameters.Add("@birthdatestr", System.Data.DbType.String).Value = girl.BirthDateAsIs;
                 CMD.Parameters.Add("@views", System.Data.DbType.Int32).Value = girl.Views;
                 CMD.Parameters.Add("@rating", System.Data.DbType.Int32).Value = girl.Rating;
                 CMD.Parameters.Add("@ava", System.Data.DbType.String).Value = girl.Ava;
                 CMD.Parameters.Add("@notes", System.Data.DbType.String).Value = "update";
-                CMD.Parameters.Add("@lastUpdate", System.Data.DbType.String).Value = DateTime.Now.ToString("yyyy-MM-dd");
+                CMD.Parameters.Add("@lastUpdate", System.Data.DbType.String).Value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 CMD.ExecuteNonQuery();
             }
 
@@ -1871,7 +2504,7 @@ where (link like '%{tBox43.Text}%') and
                 girl.Rating = Convert.ToInt32((decimal)SQL["rating"]);
                 girl.Views = Convert.ToInt32((decimal)SQL["views"]);
                 girl.Notes = SQL["notes"] == DBNull.Value ? null : (string)SQL["notes"];
-                girl.Id = Convert.ToInt32((decimal)SQL["linkid"]);
+                girl.LinkId = Convert.ToInt32((decimal)SQL["linkid"]);
             }
             return girl;
         }
@@ -1924,7 +2557,7 @@ where (link like '%{tBox43.Text}%') and
                     girl.AgeThen = Get_Age(girl.AddDate, girl.BirthDate);
                 girl.Images = fullpost_hrefs;
                 girl.Videos = srcs;
-                girl.Id = Convert.ToInt32(Regex.Match(link, @"\/(\d{1,})-").Groups[1].Value);
+                girl.LinkId = Convert.ToInt32(Regex.Match(link, @"\/(\d{1,})-").Groups[1].Value);
                 girl.Link = link;
                 girl.Ava = ava;
                 girl.Views = views;
@@ -2048,6 +2681,7 @@ where (link like '%{tBox43.Text}%') and
             }
             return oldGirl.Videos.Union(newGirl.Videos).ToList();
         }
+
         private List<string> CheckPhotos(Girl oldGirl, Girl newGirl)
         {
             List<string> newImgs = newGirl.Images.Select(x => Path.GetFileName(x)).ToList();
@@ -2074,34 +2708,6 @@ where (link like '%{tBox43.Text}%') and
             return oldGirl.Images.Union(newGirl.Images).ToList();
         }
     }
-    class VideoGirls
-    {
-        public List<VideoProperties> Properties { get; set; }
-        public VideoGirls()
-        {
-            Properties = new List<VideoProperties>();
-        }
-    }
-    class VideoProperties
-    {
-        public string GirlPage { get; set; }
-        public List<Video> Videos { get; set; }
-        public VideoProperties()
-        {
-            Videos = new List<Video>();
-        }
-    }
-    class Video
-    {
-        public string Url { get; set; }
-        private string size;
-        public string Size
-        {
-            get; set;
-        }
 
-        public string Quality { get; set; }
-        public string Duration { get; set; }
 
-    }
 }

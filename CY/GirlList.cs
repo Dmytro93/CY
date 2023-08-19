@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Windows.Media.Animation;
+using System.IO;
 
 namespace CY
 {
@@ -19,7 +20,7 @@ namespace CY
         {
             string output = "";
             //if (oldGirl.Name.CompareTo(newGirl.Name) != 0)
-            output += $"{oldGirl.Id}\n";
+            output += $"{oldGirl.LinkId}\n";
             output += $"{oldGirl.Name};{newGirl.Name}\n";
 
             if (oldGirl.Videos.Count.CompareTo(newGirl.Videos.Count) != 0)
@@ -50,6 +51,7 @@ namespace CY
             Images = new List<string>();
             Videos = new List<string>();
         }
+        public long Id { get; set; }
         public string Name { get; set; }
         public string City { get; set; }
         public string BirthDateAsIs { get; set; }
@@ -57,7 +59,7 @@ namespace CY
         public DateTime AddDate { get; set; }
         public DateTime DateOfState { get; set; }
         public string Link { get; set; }
-        public int Id { get; set; }
+        public int LinkId { get; set; }
         public string Socials { get; set; }
         public decimal AgeThen { get; set; }
         public int Rating { get; set; }
@@ -90,4 +92,85 @@ namespace CY
         public string LastUpdate { get; set; }
     }
 
+    class VideoGirls
+    {
+        public List<VideoProperties> Properties { get; set; }
+        public VideoGirls()
+        {
+            Properties = new List<VideoProperties>();
+        }
+    }
+    class VideoProperties
+    {
+        public string GirlPage { get; set; }
+        public List<Video> Videos { get; set; }
+        public VideoProperties()
+        {
+            Videos = new List<Video>();
+        }
+    }
+    class Video
+    {
+        public string Url { get; set; }
+        public string Filename
+        {
+            get
+            {
+                if (Url == null) return null;
+                return Path.GetFileName(Url);
+            }
+
+        }
+        private string size;
+        public string Size
+        {
+            get
+            {
+                return StringSizeFormat(size);
+            }
+
+            set
+            {
+                size = value;
+            }
+        }
+
+        public string Quality { get; set; }
+        public string Duration { get; set; }
+
+        private string notes;
+        public string Notes
+        {
+            get
+            {
+                if (notes == null)
+                    return null;
+                return notes;
+            }
+            set
+            {
+                if (notes != value)
+                {
+                    notes = value;
+                    Notify?.Invoke(this);
+                }
+            }
+        }
+        public delegate void VideoHandler(Video video);
+        public event VideoHandler Notify;
+        public long girlId { get; set; }
+
+        private string StringSizeFormat(string sizeInBytes)
+        {
+            //TODO something
+            return sizeInBytes;
+            if (string.IsNullOrEmpty(sizeInBytes))
+                return "";
+            decimal dec = Convert.ToDecimal(sizeInBytes);
+            if (dec < 1024m * 1024m)
+                return string.Format("{0:0.000}", Convert.ToDecimal(sizeInBytes) / 1024 / 1024);
+            return string.Format("{0:#}", Convert.ToDecimal(sizeInBytes) / 1024 / 1024);
+        }
+
+    }
 }
