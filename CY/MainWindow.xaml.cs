@@ -36,6 +36,9 @@ namespace CY
         public string Password { get; set; }
         public string RootDatabaseFileFolder { get; set; }
         public string Host { get; set; }
+        public string ThumbnailPythonScript { get; set; }
+        public string ThumbnailsFolder { get; set; }
+        public string Player { get; set; }
     }
     /// <summary>
     /// Логика взаимодействия для MainWindow.xaml
@@ -57,16 +60,23 @@ namespace CY
                 UserPassword = settings.Password;
                 RootDatabaseFileFolder = settings.RootDatabaseFileFolder;
                 Host = "https://" + settings.Host;
+                ThumbnailPythonScript = settings.ThumbnailPythonScript;
+                ThumbnailsFolder = settings.ThumbnailsFolder;
+                Player = settings.Player;
                 Dispatcher.Invoke(() => LoginTB.Text = UserLogin);
                 Dispatcher.Invoke(() => PWTB.Password = UserPassword);
             }
         }
+
+        private static string Player { get; set; }
         string RootDatabaseFileFolder { get; set; }
+        string ThumbnailsFolder { get; set; }
         static HttpClientHandler handler { get; set; } = new HttpClientHandler();
         HttpClient httpClient;
         private CookieCollection _cc = new CookieCollection();
         private CookieContainer container = new CookieContainer();
         private string Host { get; set; }
+        string ThumbnailPythonScript { get; set; }
         private SQLiteConnection DB;
         const string _userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:86.0) Gecko/20100101 Firefox/86.0";
         private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -1113,7 +1123,7 @@ where (link like '%{tBox43.Text}%') and
             IEnumerable<long> hasAnyVids;
             pickedVideosTemp = pickedVideos.Where(y => ((int.TryParse(y.Quality, out int intQuality) ? intQuality : 0) >= quality));
             if (withThumbnail.IsChecked == true)
-                pickedVideosTemp = pickedVideosTemp.Where(x => !string.IsNullOrWhiteSpace(x.Url) && File.Exists(Path.Combine("E:\\My_thumbnails", Path.GetFileName(x.Url) + ".jpg")));
+                pickedVideosTemp = pickedVideosTemp.Where(x => !string.IsNullOrWhiteSpace(x.Url) && File.Exists(Path.Combine(ThumbnailsFolder, Path.GetFileName(x.Url) + ".jpg")));
             hasAnyVids = pickedVideosTemp.Select(x=>x.girlId).ToList();
             List<Girl> girls = new List<Girl>();
             var state = GetGirlDownloadState();
@@ -1161,9 +1171,9 @@ where (link like '%{tBox43.Text}%') and
         //    else
         //    {
         //        if (withThumbnail.IsChecked == true)
-        //            filteredVideoInfos = pickedVideoInfos.Where(x => !string.IsNullOrWhiteSpace(x.Videos[0].Url) && File.Exists(Path.Combine("E:\\My_thumbnails", Path.GetFileName(x.Videos[0].Url) + ".jpg")) && IsVideosCountInRange(desiredRange, x.Videos.Count));
+        //            filteredVideoInfos = pickedVideoInfos.Where(x => !string.IsNullOrWhiteSpace(x.Videos[0].Url) && File.Exists(Path.Combine(ThumbnailsFolder, Path.GetFileName(x.Videos[0].Url) + ".jpg")) && IsVideosCountInRange(desiredRange, x.Videos.Count));
         //        else
-        //            filteredVideoInfos = pickedVideoInfos.Where(x => !string.IsNullOrWhiteSpace(x.Videos[0].Url) && !File.Exists(Path.Combine("E:\\My_thumbnails", Path.GetFileName(x.Videos[0].Url) + ".jpg")) && IsVideosCountInRange(desiredRange, x.Videos.Count));
+        //            filteredVideoInfos = pickedVideoInfos.Where(x => !string.IsNullOrWhiteSpace(x.Videos[0].Url) && !File.Exists(Path.Combine(ThumbnailsFolder, Path.GetFileName(x.Videos[0].Url) + ".jpg")) && IsVideosCountInRange(desiredRange, x.Videos.Count));
         //        hasAnyVids = filteredVideoInfos.Where(x => x.Videos.Where(y => ((int.TryParse(y.Quality, out int intQuality) ? intQuality : 0) >= quality) &&
         //GetDurationRange(y.Quality, tBox49.Text, y.Duration))
         //.Count() > 0).Select(x => x.GirlPage);
@@ -1356,7 +1366,6 @@ where (link like '%{tBox43.Text}%') and
             }
         }
         private List<Video> ForPlaylist { get; set; }
-        private static string player = @"C:\Program Files\DAUM\PotPlayer\PotPlayerMini64.exe";
         private async void Click_ToPlay(object sender, RoutedEventArgs e)
         {
             await Task.Run(() => TryStartPlaylist(true));
@@ -1397,7 +1406,7 @@ where (link like '%{tBox43.Text}%') and
             }
             string playListFileName = Environment.CurrentDirectory + $"\\{DateTime.Now:hh.mm.ss}.dpl";
             File.WriteAllText($@"{playListFileName}", daumPlaylistTemplayer);
-            Process.Start(player, playListFileName);
+            Process.Start(Player, playListFileName);
         }
         private void TryStartPlaylist(List<Video> forPlaylist)
         {
@@ -1416,13 +1425,13 @@ where (link like '%{tBox43.Text}%') and
             }
             string playListFileName = Environment.CurrentDirectory + $"\\{DateTime.Now:hh.mm.ss}.dpl";
             File.WriteAllText($@"{playListFileName}", daumPlaylistTemplayer);
-            Process.Start(player, playListFileName);
+            Process.Start(Player, playListFileName);
         }
         private async Task GoThroughTheImages(List<Video> videos)
         {
             foreach (var x in videos)
             {
-                string thumbnail = Path.Combine(@"E:\My_thumbnails", Path.GetFileName(x.Url) + ".jpg");
+                string thumbnail = Path.Combine(ThumbnailsFolder, Path.GetFileName(x.Url) + ".jpg");
                 Dispatcher.Invoke(() => LoadImage(thumbnail));
                 await Task.Delay(300);
             }
@@ -1979,7 +1988,7 @@ where (link like '%{tBox43.Text}%') and
                     StartInfo =
                 {
                     FileName = "cmd",
-                    Arguments = "/C python \"G:\\Мій диск\\DOCS\\Visual Studio Code\\old_files\\thumbnails_maker.py\" " +
+                    Arguments = $"/C python \"{ThumbnailPythonScript}\" " +
         "-l " + url,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
@@ -1988,7 +1997,7 @@ where (link like '%{tBox43.Text}%') and
                 }
                 };
                 process.Start();
-                string thumbnailPath = Path.Combine("E:\\My_thumbnails", Path.GetFileName(url) + ".jpg");
+                string thumbnailPath = Path.Combine(ThumbnailsFolder, Path.GetFileName(url) + ".jpg");
                 Stopwatch sw = new Stopwatch();
                 sw.Start();
                 while (true)
@@ -2014,7 +2023,7 @@ where (link like '%{tBox43.Text}%') and
                 return;
             var item = items[items.Count - 1] as Video;
             //string name_wo_ext = Path.GetFileNameWithoutExtension(item.Title);
-            string thumbnail = Path.Combine(@"E:\My_thumbnails", Path.GetFileName(item.Url) + ".jpg");
+            string thumbnail = Path.Combine(ThumbnailsFolder, Path.GetFileName(item.Url) + ".jpg");
             Dispatcher.Invoke(() => LoadImage(thumbnail));
         }
         private void LoadImage(string thumbnail, string title = "ImgPreview")
@@ -2194,7 +2203,7 @@ where (link like '%{tBox43.Text}%') and
                     bool thumbnailStatus = false;
                     foreach (string vid in girl.Videos)
                     {
-                        string thumbnailPath = Path.Combine("E:\\My_thumbnails", Path.GetFileName(vid) + ".jpg");
+                        string thumbnailPath = Path.Combine(ThumbnailsFolder, Path.GetFileName(vid) + ".jpg");
                         if (!File.Exists(thumbnailPath))
                             thumbnailStatus = true;
                     }
@@ -2225,7 +2234,7 @@ where (link like '%{tBox43.Text}%') and
                                 else
                                     updatedVideo = new Video() { Url = newVideo, Duration = video.Duration, Quality = video.Quality, Size = video.Size, girlId = video.girlId };
                                 //
-                                string thumbnailPath = Path.Combine("E:\\My_thumbnails", Path.GetFileName(updatedVideo.Url) + ".jpg");
+                                string thumbnailPath = Path.Combine(ThumbnailsFolder, Path.GetFileName(updatedVideo.Url) + ".jpg");
                                 if (!File.Exists(thumbnailPath))
                                 {
                                     Debug.WriteLine(updatedVideo.Url);
@@ -2282,7 +2291,7 @@ where (link like '%{tBox43.Text}%') and
         //            bool thumbnailStatus = false;
         //            foreach (string vid in girl.Videos)
         //            {
-        //                string thumbnailPath = Path.Combine("E:\\My_thumbnails", Path.GetFileName(vid) + ".jpg");
+        //                string thumbnailPath = Path.Combine(ThumbnailsFolder, Path.GetFileName(vid) + ".jpg");
         //                if (!File.Exists(thumbnailPath))
         //                    thumbnailStatus = true;
         //            }
@@ -2319,7 +2328,7 @@ where (link like '%{tBox43.Text}%') and
         //                        else
         //                            updatedVideo = new Video() { Url = newVideo, Duration = video.Duration, Quality = video.Quality, Size = video.Size };
         //                        //
-        //                        string thumbnailPath = Path.Combine("E:\\My_thumbnails", Path.GetFileName(updatedVideo.Url) + ".jpg");
+        //                        string thumbnailPath = Path.Combine(ThumbnailsFolder, Path.GetFileName(updatedVideo.Url) + ".jpg");
         //                        if (!File.Exists(thumbnailPath))
         //                        {
         //                            Debug.WriteLine(updatedVideo.Url);
